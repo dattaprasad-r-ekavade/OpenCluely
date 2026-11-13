@@ -416,6 +416,15 @@ pub fn run() {
             }
             tray.build(app)?;
 
+            // Debug aid: OPENCLUELY_CAPTURE_VISIBLE=1 lets screenshots and screen
+            // share see the window (to check its rendering or record a demo).
+            if std::env::var("OPENCLUELY_CAPTURE_VISIBLE").is_ok_and(|v| v == "1") {
+                if let Some(w) = app.get_webview_window(WINDOW) {
+                    let _ = w.set_content_protected(false);
+                    eprintln!("[debug] content protection OFF: the window is visible to capture");
+                }
+            }
+
             warm_up(app.handle(), settings);
             Ok(())
         })
