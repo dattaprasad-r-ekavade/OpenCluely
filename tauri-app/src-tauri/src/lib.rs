@@ -50,6 +50,46 @@ struct AppState {
     codex: Mutex<Option<CodexApp>>,
     shortcut_errors: std::sync::Mutex<Vec<String>>,
     placed: AtomicBool,
+    /// Content protection on (hidden from capture). Always true at start.
+    stealth: AtomicBool,
+}
+
+/// Tray menu item that shows the stealth state.
+struct StealthItem(MenuItem<tauri::Wry>);
+
+fn stealth_label(on: bool) -> &'static str {
+    if on {
+        "Stealth: ON - hidden from capture (Ctrl+Shift+8)"
+    } else {
+        "Stealth: OFF - VISIBLE to capture (Ctrl+Shift+8)"
+    }
+}
+
+/// Turn content protection on or off. Off makes the window visible to
+/// screen share, recording AND remote-desktop tools (Chrome Remote Desktop).
+fn set_stealth(app: &AppHandle, on: bool) {
+    app.state::<AppState>().stealth.store(on, Ordering::SeqCst);
+    if let Some(w) = answer_window(app) {
+        let _ = w.set_content_protected(on);
+    }
+    if let Some(item) = app.try_state::<StealthItem>() {
+        let _ = item.0.set_text(stealth_label(on));
+    }
+    let _ = app.emit_to(WINDOW, "stealth", on);
+}
+
+fn toggle_stealth(app: &AppHandle) {
+    let app = app.clone();
+    // Not on the event-loop thread: see `toggle_window`.
+    tauri::async_runtime::spawn(async move {
+        let on = !app.state::<AppState>().stealth.load(Ordering::SeqCst);
+        set_stealth(&app, on);
+        if !on {
+            // Show the window, so a remote-desktop user can see it at once.
+            let cursor = app.cursor_position().ok();
+            show_on_monitor(&app, cursor);
+        }
+    });
 }
 
 fn emit(app: &AppHandle, kind: &'static str, id: u64, text: impl Into<String>) {
@@ -274,6 +314,7 @@ struct ConfigView {
     settings: Settings,
     settings_path: String,
     shortcut_errors: Vec<String>,
+    stealth: bool,
 }
 
 #[tauri::command]
@@ -282,7 +323,13 @@ async fn get_config(state: tauri::State<'_, AppState>) -> Result<ConfigView, Str
         settings: state.settings.lock().await.clone(),
         settings_path: state.settings_path.to_string_lossy().into_owned(),
         shortcut_errors: state.shortcut_errors.lock().unwrap().clone(),
+        stealth: state.stealth.load(Ordering::SeqCst),
     })
+}
+
+#[tauri::command]
+fn toggle_stealth_cmd(app: AppHandle) {
+    toggle_stealth(&app);
 }
 
 #[tauri::command]
@@ -351,8 +398,19 @@ fn quit_app(app: AppHandle) {
 pub fn run() {
     let ask = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Digit0);
     let toggle = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Digit9);
+    let stealth = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Digit8);
 
     let app = tauri::Builder::default()
+        // Must be the first plugin. A second copy of the app exits at once
+        // (two copies would fight over the global shortcuts); the running
+        // copy shows its window instead.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let cursor = app.cursor_position().ok();
+                show_on_monitor(&app, cursor);
+            });
+        }))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, sc, ev| {
@@ -363,6 +421,8 @@ pub fn run() {
                         ask_screen(app);
                     } else if sc == &toggle {
                         toggle_window(app);
+                    } else if sc == &stealth {
+                        toggle_stealth(app);
                     }
                 })
                 .build(),
@@ -386,10 +446,11 @@ pub fn run() {
                 codex: Mutex::new(None),
                 shortcut_errors: Default::default(),
                 placed: AtomicBool::new(false),
+                stealth: AtomicBool::new(true),
             });
 
             let gs = app.global_shortcut();
-            for (sc, name) in [(ask, "Ctrl+Shift+0"), (toggle, "Ctrl+Shift+9")] {
+            for (sc, name) in [(ask, "Ctrl+Shift+0"), (toggle, "Ctrl+Shift+9"), (stealth, "Ctrl+Shift+8")] {
                 if let Err(e) = gs.register(sc) {
                     let msg = format!("{name} is used by another app: {e}");
                     eprintln!("[shortcut] {msg}");
@@ -400,14 +461,17 @@ pub fn run() {
             // Tray icon: the window is not in the taskbar, so this is the way to quit.
             let ask_item = MenuItem::with_id(app, "ask", "Analyze screen (Ctrl+Shift+0)", true, None::<&str>)?;
             let toggle_item = MenuItem::with_id(app, "toggle", "Show / hide (Ctrl+Shift+9)", true, None::<&str>)?;
+            let stealth_item = MenuItem::with_id(app, "stealth", stealth_label(true), true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&ask_item, &toggle_item, &quit_item])?;
+            let menu = Menu::with_items(app, &[&ask_item, &toggle_item, &stealth_item, &quit_item])?;
+            app.manage(StealthItem(stealth_item));
             let mut tray = TrayIconBuilder::with_id("main")
                 .tooltip("OpenCluely")
                 .menu(&menu)
                 .on_menu_event(|app, ev| match ev.id().as_ref() {
                     "ask" => ask_screen(app),
                     "toggle" => toggle_window(app),
+                    "stealth" => toggle_stealth(app),
                     "quit" => app.exit(0),
                     _ => {}
                 });
@@ -419,10 +483,8 @@ pub fn run() {
             // Debug aid: OPENCLUELY_CAPTURE_VISIBLE=1 lets screenshots and screen
             // share see the window (to check its rendering or record a demo).
             if std::env::var("OPENCLUELY_CAPTURE_VISIBLE").is_ok_and(|v| v == "1") {
-                if let Some(w) = app.get_webview_window(WINDOW) {
-                    let _ = w.set_content_protected(false);
-                    eprintln!("[debug] content protection OFF: the window is visible to capture");
-                }
+                set_stealth(app.handle(), false);
+                eprintln!("[debug] content protection OFF: the window is visible to capture");
             }
 
             warm_up(app.handle(), settings);
@@ -431,6 +493,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_config,
+            toggle_stealth_cmd,
             ask_now,
             new_session,
             hide_window,

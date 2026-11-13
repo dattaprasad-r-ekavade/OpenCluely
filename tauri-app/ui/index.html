@@ -19,9 +19,13 @@
       </select>
       <button id="ask" title="Analyze screen (Ctrl+Shift+0)">&#8635;</button>
       <button id="reset" title="New conversation">&#10227;</button>
+      <button id="stealthBtn" title="Stealth on: hidden from capture. Click or Ctrl+Shift+8 to toggle.">&#128065;</button>
       <button id="gear" title="Settings">&#9881;</button>
       <button id="hide" title="Hide (Ctrl+Shift+9 or Esc)">&#8211;</button>
     </header>
+    <div id="stealthWarn" hidden>
+      Stealth OFF: screen share, recording and remote desktop can see this window. Ctrl+Shift+8 turns it on.
+    </div>
 
     <form id="settings" hidden>
       <label>Code language
@@ -68,6 +72,7 @@
         <p>Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>0</kbd> to analyze the screen.</p>
         <p>This window is invisible to screen sharing and recording.</p>
         <p><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>9</kbd> or <kbd>Esc</kbd> hides it.</p>
+        <p><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>8</kbd> toggles stealth (turn it off to see this window over remote desktop).</p>
       </div>
     </main>
     <footer id="meta"></footer>

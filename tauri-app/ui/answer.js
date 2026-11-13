@@ -88,7 +88,18 @@ listen('answer', ({ payload: ev }) => {
   }
 });
 
+function showStealth(on) {
+  $('stealthWarn').hidden = on;
+  const btn = $('stealthBtn');
+  btn.classList.toggle('off', !on);
+  btn.title = on
+    ? 'Stealth on: hidden from capture. Click or Ctrl+Shift+8 to toggle.'
+    : 'Stealth OFF: visible to capture. Click or Ctrl+Shift+8 to toggle.';
+}
+listen('stealth', ({ payload }) => showStealth(payload));
+
 // ------------------------------------------------------------ controls
+$('stealthBtn').onclick = () => invoke('toggle_stealth_cmd');
 $('ask').onclick = () => invoke('ask_now');
 $('hide').onclick = () => invoke('hide_window');
 $('quit').onclick = () => invoke('quit_app');
@@ -136,6 +147,7 @@ form.onsubmit = async (e) => {
   $('path').textContent = cfg.settings_path;
   $('path').title = cfg.settings_path;
   fillForm();
+  showStealth(cfg.stealth);
   if (cfg.shortcut_errors.length) {
     setStatus(cfg.shortcut_errors.join(' | '), 'bad');
   }
