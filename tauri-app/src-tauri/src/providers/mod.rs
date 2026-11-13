@@ -11,8 +11,21 @@ use std::sync::Arc;
 /// Receives answer text as it arrives.
 pub type DeltaFn = Arc<dyn Fn(&str) + Send + Sync>;
 
-/// The instruction sent with every screenshot.
-pub fn screen_prompt(language: &str, extra: &str) -> String {
+/// The instruction sent with every screenshot. `custom` replaces the
+/// built-in prompt when it is not empty.
+pub fn screen_prompt(language: &str, custom: &str, extra: &str) -> String {
+    if !custom.trim().is_empty() {
+        let mut p = custom.trim().to_string();
+        if !extra.trim().is_empty() {
+            p.push_str("\n\n");
+            p.push_str(extra.trim());
+        }
+        return p;
+    }
+    default_prompt(language, extra)
+}
+
+fn default_prompt(language: &str, extra: &str) -> String {
     let lang = if language.trim().is_empty() || language == "auto" {
         "the programming language shown on the screen (use Python if none is shown)".to_string()
     } else {

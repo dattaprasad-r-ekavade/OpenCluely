@@ -102,9 +102,62 @@ jobs:
           path: ${{ matrix.artifact_glob }}
           if-no-files-found: warn
 
+  # OpenCluely 2 (Tauri + Rust) screen assistant: Windows installer + portable exe.
+  build-tauri:
+    name: Build Tauri app (windows-latest)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tauri-app/src-tauri
+
+      - name: Setup Node.js (for the Tauri CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Bundle names and the in-app version come from tauri.conf.json.
+      - name: Sync app version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: tauri-app/src-tauri
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          node -e "const fs=require('fs');const j=JSON.parse(fs.readFileSync('tauri.conf.json','utf8'));j.version=process.argv[1];fs.writeFileSync('tauri.conf.json',JSON.stringify(j,null,2)+'\n')" "$VERSION"
+          sed -i "0,/^version = \".*\"/s//version = \"$VERSION\"/" Cargo.toml
+          echo "App version: $VERSION"
+
+      - name: Build
+        working-directory: tauri-app
+        run: npx --yes @tauri-apps/cli@2 build
+
+      - name: Collect files
+        run: |
+          VERSION=$(node -p "require('./tauri-app/src-tauri/tauri.conf.json').version")
+          mkdir -p out
+          cp -v tauri-app/src-tauri/target/release/bundle/nsis/*-setup.exe out/
+          cp -v tauri-app/src-tauri/target/release/opencluely.exe "out/OpenCluely_${VERSION}_x64-portable.exe"
+          ls -la out
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencluely-tauri-windows
+          path: out/*
+          if-no-files-found: error
+
   release:
     name: Create GitHub Release
-    needs: build
+    needs: [build, build-tauri]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -177,6 +230,23 @@ jobs:
 
           Choose the artifact for your platform:
 
+          ### OpenCluely 2: screen assistant (Tauri + Rust, Windows)
+
+          Press **Ctrl+Shift+0** to send a screenshot to the AI; the answer streams into a small
+          floating window that screen share and recording can not see. Uses the **Grok CLI**,
+          **Codex CLI** or the **Gemini API**. All hotkeys, look and AI options are in Settings
+          (tray icon → Settings).
+
+          | File | Notes |
+          |---|---|
+          | `OpenCluely_*_x64-setup.exe` | Installer (per user, no admin rights needed) |
+          | `OpenCluely_*_x64-portable.exe` | Single exe, no install |
+
+          Needs the `grok` or `codex` CLI installed and signed in, or a Gemini API key.
+          The build is not code-signed: in the SmartScreen prompt click **More info → Run anyway**.
+
+          ### OpenCluely 1 (Electron, voice + screenshot)
+
           | Platform | File | Notes |
           |---|---|---|
           | **Windows** | `OpenCluely-Setup-*.exe` | NSIS installer — installs app + adds to Start Menu |
@@ -234,6 +304,11 @@ jobs:
           #   - Source archives (GitHub auto-generates these from the tag)
           #
           # The order below is the order files appear in the release page.
+          # OpenCluely 2 (Tauri) screen assistant first.
+          find artifacts -type f -name 'OpenCluely_*_x64-setup.exe' \
+            -exec cp -v {} release/ \;
+          find artifacts -type f -name 'OpenCluely_*_x64-portable.exe' \
+            -exec cp -v {} release/ \;
           find artifacts -type f -name 'OpenCluely-Setup-*.exe' \
             -exec cp -v {} release/ \;
           find artifacts -type f -name 'opencluely_*_amd64.deb' \

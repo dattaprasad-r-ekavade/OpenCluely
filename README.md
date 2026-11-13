@@ -24,6 +24,35 @@ Real-time AI help on a stealth overlay that screen sharing cannot see. Ask by vo
 
 https://github.com/user-attachments/assets/896a7140-1e85-405d-bfbe-e05c9f3a816b
 
+## New: OpenCluely 2 (Tauri + Rust)
+
+OpenCluely 2 is a fast, lightweight rewrite of the screen assistant in Tauri and Rust. It lives in [`tauri-app/`](tauri-app/) and ships as a Windows installer (about 3 MB) or a single portable exe (about 9 MB).
+
+- **Ask about your screen.** Press `Ctrl+Shift+0`. The app captures the monitor under your mouse, sends it to the AI, and streams the answer into a small floating window. It answers multiple-choice questions, coding problems, error messages and more, in about 3 to 5 seconds.
+- **Invisible to capture.** The window is hidden from screen share, recording and remote-desktop tools, appears without stealing focus, and stays out of the taskbar. A stealth toggle (`Ctrl+Shift+8`) makes it visible when you need it, for example over Chrome Remote Desktop.
+- **Your choice of AI.** Use the **Grok CLI** or the **Codex CLI** (both kept warm as one background process, so answers stream quickly and follow-up questions keep their context), or the **Gemini API** with a key.
+- **Everything is configurable.** Open Settings from the tray icon or the gear button: hotkeys, opacity, text size, theme, size, position, always-on-top, click-through, auto-hide, capture monitor and image quality, provider, model, effort, code language, custom prompt, and launch at login.
+- **Light.** About 170 MB of private memory, compared with about 870 MB for the Electron app.
+
+| Default hotkey | Action |
+|---|---|
+| `Ctrl+Shift+0` | Analyze the screen |
+| `Ctrl+Shift+9` | Show or hide the answer window (`Esc` also hides it) |
+| `Ctrl+Shift+8` | Toggle stealth (hidden from capture) |
+| `Ctrl+Shift+7` | Toggle click-through |
+
+**Requirements:** Windows 10 2004 or later (Windows 11 recommended), and one of: the [Grok CLI](https://x.ai) signed in, the [Codex CLI](https://github.com/openai/codex) signed in, or a Gemini API key.
+
+**Build from source:** install Rust and the Tauri CLI (`cargo install tauri-cli --version "^2"`), then:
+
+```bash
+cd tauri-app/src-tauri
+cargo tauri dev      # run
+cargo tauri build    # installer in target/release/bundle/nsis/
+```
+
+The rest of this README describes OpenCluely 1, the Electron app with voice input.
+
 ## What it is
 
 OpenCluely is a desktop app for technical interviews and practice. It places a small overlay on your screen that recording and conferencing tools do not capture. You can speak a question or take a screenshot, and the AI answers in real time. The answer streams into a floating window and an optional chat panel, with clean code blocks and syntax highlighting.

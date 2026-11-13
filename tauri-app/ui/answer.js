@@ -8,17 +8,31 @@ const statusEl = $('status');
 const dotEl = $('dot');
 const metaEl = $('meta');
 const providerEl = $('provider');
-const form = $('settings');
 
 let settings = null;
 let currentId = 0;
 let text = '';
 let renderQueued = false;
+let hideTimer = null;
+let hovered = false;
 
 // The model output is untrusted: render raw HTML in it as text.
 const escapeHtml = (s) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 marked.use({ gfm: true, breaks: false, renderer: { html: (token) => escapeHtml(token.text || '') } });
+
+const kbd = (accel) =>
+  accel ? accel.split('+').map((k) => `<kbd>${escapeHtml(k)}</kbd>`).join('+') : '<em>no hotkey</em>';
+
+function showHint(first) {
+  if (!settings) return;
+  answerEl.innerHTML = `<div class="hint">
+    <p>${first || 'Press'} ${kbd(settings.hotkey_ask)} to analyze the screen.</p>
+    <p>This window is invisible to screen sharing and recording.</p>
+    <p>${kbd(settings.hotkey_toggle)} or <kbd>Esc</kbd> hides it. ${kbd(settings.hotkey_stealth)} toggles stealth.</p>
+    <p>Change hotkeys, look and AI in settings (&#9881;).</p>
+  </div>`;
+}
 
 function setStatus(msg, state) {
   statusEl.textContent = msg;
@@ -54,6 +68,51 @@ function queueRender() {
   }
 }
 
+// ------------------------------------------------------------ auto-hide
+function clearAutoHide() {
+  clearTimeout(hideTimer);
+  hideTimer = null;
+}
+function scheduleAutoHide() {
+  clearAutoHide();
+  const secs = settings?.auto_hide_secs || 0;
+  if (secs <= 0) return;
+  hideTimer = setTimeout(function tick() {
+    // Wait while the mouse is over the window (the user is reading).
+    if (hovered) {
+      hideTimer = setTimeout(tick, 1000);
+      return;
+    }
+    invoke('hide_window');
+  }, secs * 1000);
+}
+document.addEventListener('mouseenter', () => (hovered = true));
+document.addEventListener('mouseleave', () => (hovered = false));
+
+// ------------------------------------------------------------ appearance
+function applySettings(s) {
+  settings = s;
+  const root = document.documentElement;
+  root.dataset.theme = s.theme === 'light' ? 'light' : 'dark';
+  root.style.setProperty('--alpha', String(s.opacity / 100));
+  root.style.setProperty('--font-size', `${s.font_size}px`);
+  providerEl.value = s.provider;
+  $('ask').title = `Analyze screen${s.hotkey_ask ? ` (${s.hotkey_ask})` : ''}`;
+  $('hide').title = `Hide (${s.hotkey_toggle ? s.hotkey_toggle + ' or ' : ''}Esc)`;
+  if (!text && !currentId) showHint();
+}
+
+function showStealth(on) {
+  $('stealthWarn').hidden = on;
+  const btn = $('stealthBtn');
+  btn.classList.toggle('off', !on);
+  const hk = settings?.hotkey_stealth ? ` (${settings.hotkey_stealth})` : '';
+  btn.title = on
+    ? `Stealth ON: hidden from capture. Click to turn off${hk}.`
+    : `Stealth OFF: VISIBLE to capture. Click to turn on${hk}.`;
+}
+
+// ------------------------------------------------------------ events
 listen('answer', ({ payload: ev }) => {
   if (ev.id < currentId) return; // a stale, cancelled request
   switch (ev.kind) {
@@ -62,6 +121,7 @@ listen('answer', ({ payload: ev }) => {
       text = '';
       answerEl.innerHTML = '';
       metaEl.textContent = '';
+      clearAutoHide();
       setStatus('Starting…', 'busy');
       break;
     case 'status':
@@ -76,6 +136,7 @@ listen('answer', ({ payload: ev }) => {
       render();
       setStatus('Done', 'ok');
       metaEl.textContent = ev.text;
+      scheduleAutoHide();
       break;
     case 'error': {
       setStatus('Error', 'bad');
@@ -87,68 +148,33 @@ listen('answer', ({ payload: ev }) => {
     }
   }
 });
-
-function showStealth(on) {
-  $('stealthWarn').hidden = on;
-  const btn = $('stealthBtn');
-  btn.classList.toggle('off', !on);
-  btn.title = on
-    ? 'Stealth on: hidden from capture. Click or Ctrl+Shift+8 to toggle.'
-    : 'Stealth OFF: visible to capture. Click or Ctrl+Shift+8 to toggle.';
-}
+listen('settings', ({ payload }) => applySettings(payload));
 listen('stealth', ({ payload }) => showStealth(payload));
+listen('click_through', ({ payload }) => ($('clickBadge').hidden = !payload));
+listen('new_chat', () => {
+  text = '';
+  currentId = 0;
+  metaEl.textContent = '';
+  clearAutoHide();
+  showHint('New conversation. Press');
+  setStatus('Ready', 'idle');
+});
 
 // ------------------------------------------------------------ controls
-$('stealthBtn').onclick = () => invoke('toggle_stealth_cmd');
 $('ask').onclick = () => invoke('ask_now');
 $('hide').onclick = () => invoke('hide_window');
-$('quit').onclick = () => invoke('quit_app');
-$('reset').onclick = async () => {
-  await invoke('new_session');
-  text = '';
-  answerEl.innerHTML = '<div class="hint"><p>New conversation. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>0</kbd>.</p></div>';
-  metaEl.textContent = '';
-  setStatus('Ready', 'idle');
-};
-$('gear').onclick = () => {
-  form.hidden = !form.hidden;
-};
+$('reset').onclick = () => invoke('new_session');
+$('gear').onclick = () => invoke('open_settings');
+$('stealthBtn').onclick = () => invoke('toggle_stealth_cmd');
+providerEl.onchange = () => invoke('set_provider', { provider: providerEl.value });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') invoke('hide_window');
 });
 
-providerEl.onchange = async () => {
-  settings.provider = providerEl.value;
-  await invoke('save_config', { settings });
-  setStatus(`Provider: ${providerEl.options[providerEl.selectedIndex].text}`, 'idle');
-};
-
-function fillForm() {
-  for (const el of form.elements) {
-    if (el.name && el.name in settings) el.value = settings[el.name] ?? '';
-  }
-  providerEl.value = settings.provider;
-}
-
-form.onsubmit = async (e) => {
-  e.preventDefault();
-  for (const el of form.elements) {
-    if (el.name && el.name in settings) settings[el.name] = el.value;
-  }
-  settings.provider = providerEl.value;
-  await invoke('save_config', { settings });
-  form.hidden = true;
-  setStatus('Settings saved', 'ok');
-};
-
 (async () => {
   const cfg = await invoke('get_config');
-  settings = cfg.settings;
-  $('path').textContent = cfg.settings_path;
-  $('path').title = cfg.settings_path;
-  fillForm();
+  applySettings(cfg.settings);
   showStealth(cfg.stealth);
-  if (cfg.shortcut_errors.length) {
-    setStatus(cfg.shortcut_errors.join(' | '), 'bad');
-  }
+  $('clickBadge').hidden = !cfg.click_through;
+  if (cfg.hotkey_errors.length) setStatus(cfg.hotkey_errors.join(' | '), 'bad');
 })();
