@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Answer</title>
+  <link rel="stylesheet" href="answer.css" />
+  <script src="vendor/marked.umd.js"></script>
+</head>
+<body>
+  <div id="card">
+    <header id="bar" data-tauri-drag-region>
+      <span id="dot" class="dot idle"></span>
+      <span id="status" data-tauri-drag-region>Ready</span>
+      <select id="provider" title="AI provider">
+        <option value="grok">Grok CLI</option>
+        <option value="codex">Codex CLI</option>
+        <option value="gemini">Gemini API</option>
+      </select>
+      <button id="ask" title="Analyze screen (Ctrl+Shift+0)">&#8635;</button>
+      <button id="reset" title="New conversation">&#10227;</button>
+      <button id="gear" title="Settings">&#9881;</button>
+      <button id="hide" title="Hide (Ctrl+Shift+9 or Esc)">&#8211;</button>
+    </header>
+
+    <form id="settings" hidden>
+      <label>Code language
+        <select name="language">
+          <option value="auto">Auto (from screen)</option>
+          <option>Python</option><option>C++</option><option>Java</option>
+          <option>JavaScript</option><option>TypeScript</option><option>C</option>
+          <option>Go</option><option>Rust</option><option>C#</option><option>SQL</option>
+        </select>
+      </label>
+      <label>Extra instructions
+        <textarea name="extra_instructions" rows="2" placeholder="e.g. Answer in German. Keep code short."></textarea>
+      </label>
+      <fieldset>
+        <legend>Grok CLI</legend>
+        <label>Model <input name="grok_model" placeholder="default (e.g. grok-4.7-build-fast)" /></label>
+        <label>Effort
+          <select name="grok_effort"><option>low</option><option>medium</option><option>high</option><option>xhigh</option></select>
+        </label>
+        <label>Path <input name="grok_path" placeholder="auto-detect" /></label>
+      </fieldset>
+      <fieldset>
+        <legend>Codex CLI</legend>
+        <label>Model <input name="codex_model" placeholder="gpt-6-luna" /></label>
+        <label>Effort
+          <select name="codex_effort"><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select>
+        </label>
+        <label>Path <input name="codex_path" placeholder="auto-detect" /></label>
+      </fieldset>
+      <fieldset>
+        <legend>Gemini API</legend>
+        <label>API key <input name="gemini_api_key" type="password" autocomplete="off" /></label>
+        <label>Model <input name="gemini_model" /></label>
+      </fieldset>
+      <div class="row">
+        <small id="path"></small>
+        <button type="button" id="quit" class="ghost">Quit app</button>
+        <button type="submit">Save</button>
+      </div>
+    </form>
+
+    <main id="answer">
+      <div class="hint">
+        <p>Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>0</kbd> to analyze the screen.</p>
+        <p>This window is invisible to screen sharing and recording.</p>
+        <p><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>9</kbd> or <kbd>Esc</kbd> hides it.</p>
+      </div>
+    </main>
+    <footer id="meta"></footer>
+  </div>
+  <script src="answer.js"></script>
+</body>
+</html>
