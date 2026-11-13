@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenCluely Settings</title>
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <nav id="tabs">
+    <button data-tab="general" class="active">General</button>
+    <button data-tab="hotkeys">Hotkeys</button>
+    <button data-tab="window">Window</button>
+    <button data-tab="capture">Capture</button>
+    <button data-tab="ai">AI</button>
+  </nav>
+
+  <form id="form" autocomplete="off">
+    <!-- ======================================================= General -->
+    <section data-panel="general" class="active">
+      <h2>Stealth</h2>
+      <div class="stealth-now">
+        <span id="stealthState"></span>
+        <button type="button" id="stealthToggle">Toggle now</button>
+      </div>
+      <label class="check"><input type="checkbox" name="start_stealth" />
+        Start in stealth mode (hidden from screen share, recording and remote desktop)</label>
+      <p class="note">Turn stealth off only to test over remote desktop or to record a demo.</p>
+
+      <h2>Startup</h2>
+      <label class="check"><input type="checkbox" name="launch_at_login" /> Launch OpenCluely when I sign in</label>
+
+      <h2>About</h2>
+      <p class="note">OpenCluely <span id="version"></span></p>
+      <p class="note">Settings file: <code id="path"></code></p>
+      <div class="row">
+        <button type="button" id="reset" class="ghost">Reset all to defaults</button>
+        <button type="button" id="quit" class="danger">Quit OpenCluely</button>
+      </div>
+    </section>
+
+    <!-- ======================================================= Hotkeys -->
+    <section data-panel="hotkeys">
+      <h2>Global hotkeys</h2>
+      <p class="note">Click a field, then press the new key combination. Use at least one of Ctrl, Alt,
+        Shift or Win (or an F-key). <kbd>Backspace</kbd> clears a hotkey, <kbd>Esc</kbd> cancels.</p>
+      <div class="hotkeys">
+        <label>Analyze screen <input class="hk" name="hotkey_ask" readonly /></label>
+        <label>Show / hide window <input class="hk" name="hotkey_toggle" readonly /></label>
+        <label>Toggle stealth <input class="hk" name="hotkey_stealth" readonly /></label>
+        <label>Toggle click-through <input class="hk" name="hotkey_click_through" readonly /></label>
+        <label>New conversation <input class="hk" name="hotkey_new_chat" readonly /></label>
+      </div>
+      <p class="note">Click-through lets mouse clicks go to the app under the answer window.
+        While it is on, you can not click the window: use its hotkey or the tray menu to turn it off.</p>
+    </section>
+
+    <!-- ======================================================= Window -->
+    <section data-panel="window">
+      <h2>Look</h2>
+      <label>Background opacity <span class="range"><input type="range" name="opacity" min="20" max="100" step="5" /><output></output>%</span></label>
+      <label>Text size <span class="range"><input type="range" name="font_size" min="10" max="22" step="1" /><output></output>px</span></label>
+      <label>Theme
+        <select name="theme"><option value="dark">Dark</option><option value="light">Light</option></select>
+      </label>
+
+      <h2>Size and position</h2>
+      <label>Width <span class="unit"><input type="number" name="width" min="280" max="1600" step="10" /> px</span></label>
+      <label>Height <span class="unit"><input type="number" name="height" min="140" max="1400" step="10" /> px</span></label>
+      <label>Position
+        <select name="position">
+          <option value="top-right">Top right</option>
+          <option value="top-left">Top left</option>
+          <option value="bottom-right">Bottom right</option>
+          <option value="bottom-left">Bottom left</option>
+          <option value="remember">Where I last dragged it</option>
+        </select>
+      </label>
+
+      <h2>Behavior</h2>
+      <label class="check"><input type="checkbox" name="always_on_top" /> Always on top of other windows</label>
+      <label class="check"><input type="checkbox" name="show_on_capture" /> Show the window when a capture starts</label>
+      <label>Auto-hide after an answer <span class="unit"><input type="number" name="auto_hide_secs" min="0" max="3600" step="5" /> s (0 = never)</span></label>
+      <p class="note">Auto-hide waits while the mouse is over the window.</p>
+    </section>
+
+    <!-- ======================================================= Capture -->
+    <section data-panel="capture">
+      <h2>Screen capture</h2>
+      <label>Monitor
+        <select name="capture_monitor">
+          <option value="cursor">The monitor under the mouse</option>
+          <option value="primary">The primary monitor</option>
+        </select>
+      </label>
+      <label>Image size
+        <select name="capture_max_edge">
+          <option value="1280">1280 px (fastest)</option>
+          <option value="1600">1600 px</option>
+          <option value="2048">2048 px (default)</option>
+          <option value="2560">2560 px</option>
+          <option value="3840">3840 px</option>
+          <option value="0">Full resolution (slowest)</option>
+        </select>
+      </label>
+      <label>JPEG quality <span class="range"><input type="range" name="capture_quality" min="40" max="100" step="5" /><output></output></span></label>
+      <p class="note">A smaller image uploads faster and uses fewer tokens. Increase the size if small text
+        or code is read wrongly.</p>
+    </section>
+
+    <!-- ======================================================= AI -->
+    <section data-panel="ai">
+      <h2>Provider</h2>
+      <label>Provider
+        <select name="provider">
+          <option value="grok">Grok CLI</option>
+          <option value="codex">Codex CLI</option>
+          <option value="gemini">Gemini API</option>
+        </select>
+      </label>
+      <label>Code language
+        <select name="language">
+          <option value="auto">Auto (from screen)</option>
+          <option>Python</option><option>C++</option><option>Java</option>
+          <option>JavaScript</option><option>TypeScript</option><option>C</option>
+          <option>Go</option><option>Rust</option><option>C#</option><option>SQL</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" name="new_chat_each_capture" />
+        New conversation for every capture (no follow-up context)</label>
+
+      <h2>Prompt</h2>
+      <label class="stack">Extra instructions (added to the prompt)
+        <textarea name="extra_instructions" rows="2" placeholder="Example: Answer in German. Keep code short."></textarea>
+      </label>
+      <label class="stack">Custom prompt (replaces the built-in prompt; leave empty to use the built-in one)
+        <textarea name="custom_prompt" rows="5" placeholder="Example: Read the multiple-choice question on the screen. Reply with the option letter and one sentence of reason."></textarea>
+      </label>
+
+      <fieldset>
+        <legend>Grok CLI</legend>
+        <label>Model <input name="grok_model" list="grokModels" placeholder="CLI default" /></label>
+        <label>Effort
+          <select name="grok_effort"><option>low</option><option>medium</option><option>high</option><option>xhigh</option></select>
+        </label>
+        <label>Path <input name="grok_path" placeholder="auto-detect" /></label>
+      </fieldset>
+      <fieldset>
+        <legend>Codex CLI</legend>
+        <label>Model <input name="codex_model" list="codexModels" placeholder="gpt-6-luna" /></label>
+        <label>Effort
+          <select name="codex_effort"><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select>
+        </label>
+        <label>Path <input name="codex_path" placeholder="auto-detect" /></label>
+      </fieldset>
+      <fieldset>
+        <legend>Gemini API</legend>
+        <label>API key <input name="gemini_api_key" type="password" /></label>
+        <label>Model <input name="gemini_model" /></label>
+      </fieldset>
+      <datalist id="grokModels">
+        <option value="grok-4.7"></option><option value="grok-4.7-build-fast"></option>
+        <option value="grok-4.6"></option><option value="grok-4.5"></option>
+      </datalist>
+      <datalist id="codexModels">
+        <option value="gpt-6-luna"></option><option value="gpt-5.6-luna"></option>
+      </datalist>
+    </section>
+  </form>
+
+  <footer id="footer">
+    <div id="message"></div>
+    <button type="button" id="cancel" class="ghost">Close</button>
+    <button type="button" id="save" class="primary">Save</button>
+  </footer>
+  <script src="settings.js"></script>
+</body>
+</html>
